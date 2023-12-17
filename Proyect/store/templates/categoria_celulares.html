@@ -1,0 +1,15 @@
+
+
+{% block content %}
+    <h2>Celulares</h2>
+
+    {% if productos_celulares %}
+        <ul>
+            {% for producto in productos_celulares %}
+                <li>{{ producto.nombre }} - {{ producto.precio }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No hay productos de celulares disponibles.</p>
+    {% endif %}
+{% endblock %}
