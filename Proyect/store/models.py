@@ -1,82 +1,83 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.models import Group
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import User
 
 # Create your models here.
-class User(AbstractUser):
-    email = models.EmailField(unique=True, verbose_name='Correo Electrónico')
-    groups = models.ManyToManyField(Group, related_name='user_manage')
-    user_permissions = models.ManyToManyField(Permission, related_name='user_manage')
-    def __str__(self):
-        return self.email
 
-class Categoria(models.Model):
-    codigo_categoria = models.CharField(max_length=100)
-    categoria = models.CharField(max_length=100)
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
+class Customer(models.Model):
+	user = models.OneToOneField(User, null=True, blank=True, on_delete=models.CASCADE)
+	name = models.CharField(max_length=200, null=True)
+	email = models.CharField(max_length=200)
 
-    def _str_(self):
-        return self.categoria
+	def __str__(self):
+		return self.name
 
-class Producto(models.Model):
-    codigo_Producto = models.CharField(max_length=100)
-    codigo_categoria = models.ForeignKey(Categoria,verbose_name = 'Categoria', on_delete=models.CASCADE)
-    codigo = models.CharField(max_length=50)
-    nombre = models.CharField(max_length=100)
-    descripcion = models.TextField()
-    precio = models.DecimalField(max_digits=10, decimal_places=2)
-    stock = models.IntegerField()
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
 
-    def _str_(self):
-        return self.nombre
+class Product(models.Model):
+	name = models.CharField(max_length=200)
+	price = models.FloatField()
+	digital = models.BooleanField(default=False,null=True, blank=True)
+	image = models.ImageField(null=True, blank=True)
 
-class Cliente(models.Model):
-    codigo_cliente = models.CharField(max_length=100)
-    nombres = models.CharField(max_length=100)
-    apellidos = models.CharField(max_length=100)
-    direccion = models.CharField(max_length=200)
-    telefono = models.CharField(max_length=20)
-    email = models.EmailField()
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
+	def __str__(self):
+		return self.name
 
-    def _str_(self):
-        return f"{self.nombres} {self.apellidos}"
+	@property
+	def imageURL(self):
+		try:
+			url = self.image.url
+		except:
+			url = ''
+		return url
 
-class Pedido(models.Model):
-    codigo_pedido = models.CharField(max_length=100)
-    fecha_pedido = models.DateField()
-    cantidad = models.IntegerField()
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
+class Order(models.Model):
+	customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
+	date_ordered = models.DateTimeField(auto_now_add=True)
+	complete = models.BooleanField(default=False)
+	transaction_id = models.CharField(max_length=100, null=True)
 
-    def _str_(self):
-        return f"{self.idPedido} - {self.cliente} - {self.producto}"
+	def __str__(self):
+		return str(self.id)
+		
+	@property
+	def shipping(self):
+		shipping = False
+		orderitems = self.orderitem_set.all()
+		for i in orderitems:
+			if i.product.digital == False:
+				shipping = True
+		return shipping
 
-class Pago(models.Model):
-    Pago = models.CharField(max_length=100)
-    fecha_pago = models.DateField()
-    monto_pagado = models.DecimalField(max_digits=10, decimal_places=2)
-    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE)
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
+	@property
+	def get_cart_total(self):
+		orderitems = self.orderitem_set.all()
+		total = sum([item.get_total for item in orderitems])
+		return total 
 
-    def _str_(self):
-        return f"{self.idPago} - {self.pedido}"
+	@property
+	def get_cart_items(self):
+		orderitems = self.orderitem_set.all()
+		total = sum([item.quantity for item in orderitems])
+		return total 
 
-class Envio(models.Model):
-    Envio = models.CharField(max_length=100)
-    fecha_envio = models.DateField()
-    fecha_entrega = models.DateField()
-    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE)
-    created = models.DateTimeField(auto_now_add = True, verbose_name='Fecha de Creación' ) 
-    updated = models.DateTimeField(auto_now = True, verbose_name='Fecha de Edición' )
+class OrderItem(models.Model):
+	product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
+	order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True)
+	quantity = models.IntegerField(default=0, null=True, blank=True)
+	date_added = models.DateTimeField(auto_now_add=True)
 
-    def _str_(self):
-        return f"{self.idEnvio} - {self.pedido}"
+	@property
+	def get_total(self):
+		total = self.product.price * self.quantity
+		return total
+
+class ShippingAddress(models.Model):
+	customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True)
+	order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True)
+	address = models.CharField(max_length=200, null=False)
+	city = models.CharField(max_length=200, null=False)
+	state = models.CharField(max_length=200, null=False)
+	zipcode = models.CharField(max_length=200, null=False)
+	date_added = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return self.address
